@@ -1,15 +1,19 @@
-import { connect } from '@planetscale/database';
-import { Env } from '../types';
+import mysql from 'mysql2/promise';
 
-export const onRequestGet: PagesFunction<Env> = async ({ env }) => {
-  try {
-    const conn = connect({ url: env.DATABASE_URL });
-    const results = await conn.execute('SELECT * FROM guests ORDER BY createdAt DESC');
-    
-    return new Response(JSON.stringify(results.rows), {
-      headers: { 'Content-Type': 'application/json' }
-    });
-  } catch (error) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), { status: 500 });
+export default async function handler(req, res) {
+  if (req.method !== 'GET') {
+    return res.status(405).json({ error: 'Method Not Allowed' });
   }
-};
+
+  let conn;
+  try {
+    conn = await mysql.createConnection(process.env.DATABASE_URL);
+    const [rows] = await conn.execute('SELECT * FROM guests ORDER BY createdAt DESC');
+    await conn.end();
+    
+    return res.status(200).json(rows);
+  } catch (error) {
+    if (conn) await conn.end();
+    return res.status(500).json({ error: error.message });
+  }
+}
